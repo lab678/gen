@@ -1,0 +1,86 @@
+#4
+!pip install faiss-cpu
+
+from sentence_transformers import SentenceTransformer
+import faiss
+from transformers import pipeline
+
+documents = [
+    "Case 1: A contract dispute arose between two parties. "
+    "The court held that the agreement was valid because both parties "
+    "had clearly accepted its terms.",
+
+    "Case 2: A person was accused of negligence after causing an "
+    "accident. The court explained that negligence requires a duty of care, "
+    "a breach of that duty, and resulting harm.",
+
+    "Case 3: A tenant challenged an eviction notice. "
+    "The court held that the landlord must follow the applicable "
+    "legal procedure before evicting the tenant.",
+
+    "Case 4: A company used another company's trademark without "
+    "permission. The court held that unauthorized use of a protected "
+    "trademark could amount to infringement."
+]
+
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+document_embeddings = embedding_model.encode(documents)
+
+index = faiss.IndexFlatL2(document_embeddings.shape[1])
+index.add(document_embeddings)
+
+generator = pipeline(
+    "text-generation",
+    model="google/flan-t5-small"
+)
+
+question = input("Enter your legal question: ")
+
+question_embedding = embedding_model.encode([question])
+distances, indices = index.search(question_embedding, k=2)
+
+retrieved_documents = [documents[i] for i in indices[0]]
+context = "\n".join(retrieved_documents)
+
+print("\nRetrieved Legal Content:")
+print(context)
+
+print("\nChoose summary level:")
+print("1. Brief")
+print("2. Moderate")
+print("3. Detailed")
+
+level = input("Enter choice: ")
+
+if level == "1":
+    instruction = "Answer in 1 or 2 sentences."
+elif level == "2":
+    instruction = "Give a short paragraph explaining the main facts and decision."
+else:
+    instruction = "Give a detailed explanation of the facts, legal issue, and court decision."
+
+prompt = f"""
+You are a legal document analysis assistant.
+Use only the retrieved legal content below.
+
+Retrieved Legal Content:
+{context}
+
+Question:
+{question}
+
+Instructions:
+{instruction}
+
+Do not invent facts.
+If the information is insufficient, say so.
+"""
+
+answer = generator(
+    prompt,
+    max_new_tokens=150,
+    do_sample=False
+)[0]["generated_text"]
+
+print("\nFinal Answer:")
+print(answer)
