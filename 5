@@ -1,0 +1,56 @@
+#5
+!pip install -q crewai
+
+from crewai import Agent, Task, Crew, LLM
+
+GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
+
+llm = LLM(
+    model="gemini/gemini-3.8-flash",
+    api_key="AQ.Ab8RN6Kz7UpCL_XLCpT1g0VOAAOd0pkhJ3jaFxWyY4_r3kkHPg"
+)
+
+source = input("Starting city: ")
+destination = input("Destination: ")
+days = input("Number of days: ")
+people = input("Number of travelers: ")
+budget = input("Budget (₹): ")
+interests = input("Interests: ")
+
+info = f"""
+From: {source}
+To: {destination}
+Days: {days}
+Travelers: {people}
+Budget: ₹{budget}
+Interests: {interests}
+"""
+
+agents = [
+    Agent(role="Transport Expert", goal="Recommend affordable transport",
+          backstory="Travel transport expert.", llm=llm),
+    Agent(role="Hotel Expert", goal="Recommend affordable hotels",
+          backstory="Accommodation expert.", llm=llm),
+    Agent(role="Activity Expert", goal="Recommend suitable activities",
+          backstory="Local travel guide.", llm=llm),
+    Agent(role="Travel Planner", goal="Create a budget-friendly itinerary",
+          backstory="Experienced travel planner.", llm=llm)
+]
+
+tasks = [
+    Task(description=f"Recommend transport and estimated costs for:\n{info}",
+         expected_output="Transport options and costs.", agent=agents[0]),
+    Task(description=f"Recommend accommodation and estimated costs for:\n{info}",
+         expected_output="Hotel options and costs.", agent=agents[1]),
+    Task(description=f"Recommend activities and estimated costs for:\n{info}",
+         expected_output="Activities and costs.", agent=agents[2]),
+    Task(description=f"Create a day-wise itinerary using the previous recommendations. "
+                     f"Include a total cost breakdown and stay within the budget.\n{info}",
+         expected_output="Complete itinerary with estimated costs.", agent=agents[3])
+]
+
+crew = Crew(agents=agents, tasks=tasks)
+
+result = await crew.kickoff_async()
+print("\n===== FINAL TRAVEL ITINERARY =====")
+print(result)
