@@ -1,0 +1,26 @@
+
+!pip install -q transformers pandas
+
+import pandas as pd
+from transformers import pipeline
+
+
+df = pd.read_csv("IMDB Dataset.csv", on_bad_lines="skip")
+print("Total reviews:", len(df))
+
+
+analyzer = pipeline(
+    "sentiment-analysis",
+    model="distilbert-base-uncased-finetuned-sst-2-english"
+)
+
+
+for i, row in df.head(5).iterrows():
+    review = str(row["review"])
+    result = analyzer(review[:512])[0]
+
+    print(f"\nReview {i+1}")
+    print("Actual:", row["sentiment"].upper())
+    print("Predicted:", result["label"])
+    print("Confidence:", round(result["score"], 4))
+    print("Review:", review[:100], "...")
