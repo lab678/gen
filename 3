@@ -1,0 +1,54 @@
+
+!pip -q install biopython scikit-learn transformers sentencepiece
+
+import torch
+from Bio import Entrez
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+Entrez.email = "your_email@example.com"
+
+
+name = "google/flan-t5-small"
+tokenizer = AutoTokenizer.from_pretrained(name)
+model = AutoModelForSeq2SeqLM.from_pretrained(name)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
+
+
+def get_articles(q):
+    ids = Entrez.read(Entrez.esearch(db="pubmed", term=q, retmax=5))["IdList"]
+    if not ids:
+        return []
+    text = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="text").read()
+    return [a.strip() for a in text.split("\n\n") if len(a.strip()) > 100][:5]
+
+
+def retrieve(q, docs):
+    v = TfidfVectorizer(stop_words="english")
+    d = v.fit_transform(docs)
+    scores = cosine_similarity(v.transform([q]), d)[0]
+    return [docs[i] for i in scores.argsort()[-3:][::-1]]
+
+
+def answer(q, docs):
+    prompt = f"Use only this information to answer briefly.\n{docs}\nQuestion: {q}"
+    x = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(device)
+    y = model.generate(**x, max_new_tokens=100)
+    return tokenizer.decode(y[0], skip_special_tokens=True)
+
+
+q = input("Enter your biomedical question: ")
+docs = get_articles(q)
+print("Number of documents retrieved:", len(docs))
+
+if docs:
+    relevant = retrieve(q, docs)
+    print("\nRelevant PubMed information:")
+    for i, d in enumerate(relevant):
+        print(f"\nDocument {i+1}:\n{d[:800]}")
+    print("\nFINAL BIOMEDICAL ANSWER")
+    print(answer(q, relevant))
+else:
+    print("No PubMed documents found.")
