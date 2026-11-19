@@ -1,0 +1,91 @@
+!pip install -q -U crewai crewai-tools google-genai
+import os
+from getpass import getpass
+from crewai import Agent, Task, Crew, Process
+
+if "GEMINI_API_KEY" not in os.environ:
+    os.environ["GEMINI_API_KEY"] = getpass("Enter your Gemini API key: ")
+
+MODEL = "gemini-3.6-flash"
+
+products = {
+    "Wireless Headphones": "Price: ₹2499, Stock: 10, Delivery: 2-4 days",
+    "Smart Watch": "Price: ₹3999, Stock: 5, Delivery: 3-5 days",
+    "Bluetooth Speaker": "Price: ₹1999, Stock: 8, Delivery: 2-4 days"
+}
+
+
+product_agent = Agent(
+    role="Product Specialist",
+    goal=f"Provide pricing and availability from our catalog: {products}",
+    backstory="You manage the product catalog and never invent details.",
+    llm=MODEL,
+    verbose=True
+)
+
+order_agent = Agent(
+    role="Order Processor",
+    goal="Create order. Add fixed ₹50 delivery fee. Generate random Order ID and total.",
+    backstory="You process orders and calculate final amounts.",
+    llm=MODEL,
+    verbose=True
+)
+
+payment_agent = Agent(
+    role="Payment Processor",
+    goal="Simulate payment success and generate a fictional transaction ID.",
+    backstory="Classroom simulator. Do not run actual payments.",
+    llm=MODEL,
+    verbose=True
+)
+
+confirmation_agent = Agent(
+    role="Order Confirmer",
+    goal="Prepare a friendly final message combining order details and expected delivery.",
+    backstory="You send clean order receipts to customers.",
+    llm=MODEL,
+    verbose=True
+)
+
+# Inputs
+customer_request = input("What product would you like to buy? ")
+payment_method = input("Payment method? (UPI/Card) ")
+
+# Tasks
+product_task = Task(
+    description=f"Check availability for: '{customer_request}'",
+    expected_output="Product name, price, stock, and delivery time.",
+    agent=product_agent
+)
+
+order_task = Task(
+    description="Using the product info, create an order with an added ₹50 delivery charge.",
+    expected_output="Order ID, product, base price, delivery fee, and total amount.",
+    agent=order_agent,
+    context=[product_task]
+)
+
+payment_task = Task(
+    description=f"Simulate payment using: {payment_method}. Generate fake transaction ID.",
+    expected_output="Payment status, method, amount, and transaction ID.",
+    agent=payment_agent,
+    context=[order_task]
+)
+
+confirmation_task = Task(
+    description="Combine order & payment details into a professional final confirmation output.",
+    expected_output="A final confirmation with Order ID, total, transaction details, and delivery estimates.",
+    agent=confirmation_agent,
+    context=[product_task, order_task, payment_task]
+)
+
+crew = Crew(
+    agents=[product_agent, order_agent, payment_agent, confirmation_agent],
+    tasks=[product_task, order_task, payment_task, confirmation_task],
+    process=Process.sequential,
+    verbose=True
+)
+
+print("\n=== STARTING SUPPORT SYSTEM ===")
+result = await crew.kickoff_async()
+print("\n=== FINAL CUSTOMER RESPONSE ===\n", result)
