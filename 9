@@ -1,0 +1,38 @@
+!pip -q install transformers datasets
+
+from datasets import load_dataset
+from transformers import pipeline
+from sklearn.metrics import accuracy_score,precision_score,recall_score,f1_score
+
+data = load_dataset("mediabiasgroup/news-unfold-dataset")
+
+print(data["train"][0])
+
+classifier = pipeline(
+    "text-classification",
+    model="himel7/bias-detector"
+)
+test_data = data["train"].select(range(20))
+
+texts = list(test_data["text"])
+actual = list(test_data["label"])
+
+results = classifier(texts, batch_size=16)
+
+predicted = [
+    1 if r["label"] == "LABEL_1" else 0
+    for r in results
+]
+
+
+for i in range(20):
+    print(f"\n{i+1}. {texts[i]}")
+    print(f"Actual: {'Biased' if actual[i] else 'Unbiased'}")
+    print(f"Predicted: {'Biased' if predicted[i] else 'Unbiased'}")
+    print(f"Confidence: {results[i]['score']*100:.2f}%")
+
+print("\n===== EVALUATION METRICS (20 SENTENCES) =====")
+print(f"Accuracy:  {accuracy_score(actual, predicted) * 100:.2f}%")
+print(f"Precision: {precision_score(actual, predicted, zero_division=0) * 100:.2f}%")
+print(f"Recall:    {recall_score(actual, predicted, zero_division=0) * 100:.2f}%")
+print(f"F1-score:  {f1_score(actual, predicted, zero_division=0) * 100:.2f}%")
