@@ -1,0 +1,71 @@
+
+!pip install -q sentence-transformers faiss-cpu transformers sentencepiece accelerate
+
+import faiss
+import torch
+from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+documents = [
+    "Bangalore to Goa flights take 1 hour 20 minutes. Price starts at Rs. 3500.",
+    "Budget hotels cost Rs. 1500-3000 per night.",
+    "Popular places: Baga Beach, Calangute Beach, Fort Aguada and Dudhsagar Falls.",
+    "Baga Beach is famous for nightlife and water sports.",
+    "Fort Aguada is a Portuguese fort.",
+    "Dudhsagar is a famous waterfall.",
+    "3-day itinerary: Baga Beach, Fort Aguada, Calangute and Dudhsagar.",
+    "Best time to visit Goa is November to February.",
+    "Scooter rent costs Rs. 300-500 per day."
+]
+
+embed = SentenceTransformer("all-MiniLM-L6-v2")
+vectors = embed.encode(documents)
+
+index = faiss.IndexFlatL2(vectors.shape[1])
+index.add(vectors.astype("float32"))
+
+name = "google/flan-t5-small"
+tokenizer = AutoTokenizer.from_pretrained(name)
+model = AutoModelForSeq2SeqLM.from_pretrained(name)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
+
+history = []
+
+def travel_assistant(question):
+
+    query = embed.encode([question])
+    _, ids = index.search(query.astype("float32"), 3)
+
+    context = "\n".join(documents[i] for i in ids[0])
+
+    prompt = f"""
+    Answer the question using the information below.
+    Previous conversation: {history[-4:]}
+    Information: {context}
+    Question: {question}
+    Give a short answer. Do not invent information.
+    """
+
+    inputs = tokenizer(prompt, return_tensors="pt",
+                       truncation=True, max_length=512).to(device)
+
+    output = model.generate(**inputs, max_new_tokens=100)
+    answer = tokenizer.decode(output[0], skip_special_tokens=True)
+
+    history.append("User: " + question)
+    history.append("Assistant: " + answer)
+
+    return answer
+
+
+print("Travel Assistant Ready! Type exit to stop.")
+
+while True:
+    question = input("\nYou: ")
+
+    if question.lower().strip() == "exit":
+        break
+
+    print("Assistant:", travel_assistant(question))
