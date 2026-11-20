@@ -1,0 +1,119 @@
+!pip install -q crewai litellm
+
+
+import os
+from getpass import getpass
+from crewai import Agent, Task, Crew, Process
+
+
+api_key = getpass("Enter your Gemini API Key: ")
+os.environ["GEMINI_API_KEY"] = api_key
+
+llm = "gemini/gemini-3.5-flash-lite"
+
+
+document = """
+Technology:
+Edge computing is growing for real-time applications.
+Satellite networks connect 400 million additional users.
+Investment is shifting towards robotics and spatial computing.
+Data sovereignty laws require localized data storage.
+
+Financial:
+Global venture investment reached $45 billion with 6% growth.
+Hardware startups received 42% of investments.
+Automation reduced engineering labor costs.
+Autonomous logistics increased corporate margins by 340 basis points.
+Rare-earth shortages create supply chain risks.
+
+Recommendations:
+Prioritize localized AI model execution.
+Secure long-term synthetic material contracts.
+Train 20% of employees for human oversight roles by Q4.
+Focus on automation and decentralized infrastructure.
+"""
+
+
+
+tech_agent = Agent(
+    role="Technology Analyst",
+    goal="Summarize technology and infrastructure trends.",
+    backstory="Expert in technology and infrastructure analysis.",
+    llm=llm,
+    verbose=True
+)
+
+finance_agent = Agent(
+    role="Financial Analyst",
+    goal="Analyze financial metrics and market risks.",
+    backstory="Expert in financial and market analysis.",
+    llm=llm,
+    verbose=True
+)
+
+editor = Agent(
+    role="Chief Editor",
+    goal="Combine summaries into an executive report.",
+    backstory="Expert in preparing professional reports.",
+    llm=llm,
+    verbose=True
+)
+
+
+
+task1 = Task(
+    description=f"""
+    Analyze the document and summarize technology trends,
+    including edge computing, satellites, robotics,
+    spatial computing and data sovereignty.
+
+    Document:
+    {document}
+    """,
+    expected_output="Bulleted technology summary.",
+    agent=tech_agent
+)
+
+task2 = Task(
+    description=f"""
+    Analyze the document and summarize financial metrics,
+    investments, profit margins and market risks.
+
+    Document:
+    {document}
+    """,
+    expected_output="Bulleted financial summary.",
+    agent=finance_agent
+)
+
+task3 = Task(
+    description="""
+    Combine the technology and financial summaries.
+    Include an executive overview, technical infrastructure,
+    financial outlook and strategic recommendations.
+    Avoid repetition.
+    """,
+    expected_output="Complete executive summary in Markdown.",
+    agent=editor,
+    context=[task1, task2]
+)
+crew = Crew(
+    agents=[tech_agent, finance_agent, editor],
+    tasks=[task1, task2, task3],
+    process=Process.sequential,
+    verbose=True
+)
+
+print("\nStarting Multi-Agent Summarization...\n")
+
+result = await crew.kickoff_async()
+
+print("\n" + "=" * 50)
+print("       FINAL EXECUTIVE SUMMARY")
+print("=" * 50)
+
+print(result)
+
+print("\n" + "=" * 50)
+print("       SUMMARIZATION COMPLETED")
+print("=" * 50)
