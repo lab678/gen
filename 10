@@ -1,0 +1,27 @@
+!pip install -q detoxify
+
+from detoxify import Detoxify
+
+
+model = Detoxify("original")
+
+
+comments = [
+
+    "You are a wonderful person.",
+    "Thank you for helping me.",
+    "You are stupid and useless.",
+    "I appreciate your hard work.",
+    "Nobody likes you.",
+    "You did an excellent job."
+]
+
+
+results = model.predict(comments)["toxicity"]
+
+for comment, score in zip(comments, results):
+    label = "Toxic" if score >= 0.5 else "Non-toxic"
+    print("Comment:", comment)
+    print("Toxicity Score:", round(float(score), 3))
+    print("Prediction:", label)
+    print("-" * 30)
